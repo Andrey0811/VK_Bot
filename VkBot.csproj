@@ -6,7 +6,10 @@
     </PropertyGroup>
 
     <ItemGroup>
+      <PackageReference Include="iTextSharp" Version="5.5.13.1" />
       <PackageReference Include="Microsoft.Extensions.Http" Version="5.0.0-preview.2.20160.3" />
+      <PackageReference Include="Microsoft.Office.Excel" Version="14.0.4760.1000" />
+      <PackageReference Include="Microsoft.Office.Interop.Excel" Version="15.0.4795.1000" />
       <PackageReference Include="VkNet" Version="1.50.0" />
     </ItemGroup>
 

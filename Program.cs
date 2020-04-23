@@ -2,14 +2,9 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Threading;
 using Newtonsoft.Json.Linq;
-using VkNet;
-using VkNet.Enums.Filters;
-using VkNet.Model;
-using VkNet.Utils;
+
 
 namespace VkBot
 {
@@ -17,60 +12,42 @@ namespace VkBot
     {
         static void Main(string[] args)
         {
-            //var path = Directory.GetCurrentDirectory() + "\\";
-            var config = new FileStream(/*path +*/ "C:\\Users\\0811a\\Desktop\\vkBot\\VkBot\\VkBot\\config.txt", FileMode.Open);
+            var config = new FileStream("C:\\Users\\0811a\\Desktop\\vkBot\\VkBot\\VkBot\\config.txt", FileMode.Open);
             var reader = new StreamReader(config);
             var str = reader.ReadToEnd().Split('\n');
             reader.Close();
             var groupId = "130703143";
             var apiKey = str[0].Split()[1];
             var appId = ulong.Parse(str[1].Split()[1]);
-            //var login = str[2].Split()[1];
-            //var pass = str[3].Split()[1];
+            var server = new Server(apiKey, groupId);
+            server.Authorize();
+            var workWithDocuments = new Documents(server, 
+                "C:\\Users\\0811a\\Desktop\\", 
+                "C:\\Users\\0811a\\Desktop\\Sbot\\");
             
-            var vkClient = new VkApi();
-            var webClient = new WebClient();
-
-            vkClient.Authorize(new ApiAuthParams{ AccessToken = apiKey, Settings = Settings.All});
-            /*vkClient.Authorize(new ApiAuthParams
-            {
-                ApplicationId = appId,
-                Login = login, 
-                Password = pass,
-                Settings = Settings.All
-            });*/
-
-            var param = new VkParameters(new Dictionary<string, string> { { "group_id", groupId } });
-
             var json = string.Empty;
-
-            dynamic longPoll = JObject.Parse(vkClient.Call("groups.getLongPollServer", param).RawJson);
-            
-            //json = GetJsonAnswer(longPoll, json, webClient);
 
             while (true)
             {
-                json = GetJsonAnswer(longPoll, json, webClient);
+                json = server.GetJsonAnswer(json);
                 
                 Console.WriteLine(json);
+                var temp = JObject.Parse(json);
+                var col = temp["updates"].ToList();
                 
-                //var jsonMsg = json.IndexOf(":[]}") > -1 ? "" : $"{json} \n";
-                
-                var col = JObject.Parse(json)["updates"].ToList();
-                
-                foreach (var item in col)
+                foreach (var items in col)
                 {
-                    if (item["type"].ToString() != "message_new") continue;
-                    var urlBotMsg = $"https://api.vk.com/method/messages.send?v=5.41&access_token={apiKey}&user_id=";
+                    if (items["type"].ToString() != "message_new") 
+                        continue;
 
-                    var msg = item["object"]["message"]["text"].ToString();
+                    var msg = items["object"]["message"]["text"].ToString();
 
                     var arrayData = msg.Split(' ');
                     try
                     {
                         switch (arrayData[0].ToLower())
                         {
-                            case "get"://отправлять ссылки думаю что с гугл диск
+                            case "get":
                                 msg = GetComm(arrayData[1]);
                                 break;
                             
@@ -78,15 +55,24 @@ namespace VkBot
                                 msg = GetInform("deadlines");
                                 break;
                             
-                            case "submit"://сделать проферку на пдф
-                                var temp = webClient.DownloadString(
-                                    $"https://api.vk.com/method/{"users.get"}?{"user_ids"}={item["object"]["message"]["from_id"]}&access_token={apiKey}&v=5.103");
-                                var userJson = JObject.Parse(temp);
-                                //Console.WriteLine(temp);
-                                msg = SubmitComm(arrayData[1].ToLower(), 
-                                    item["object"]["message"]["attachments"][0]["doc"]["url"].ToString(), 
-                                    item["object"]["message"]["attachments"][0]["doc"]["title"].ToString(),
-                                    userJson["response"][0]["last_name"].ToString());
+                            case "submit":
+                                var userJson = server.Request("users.get",
+                                    new Dictionary<string, string>
+                                    {
+                                        ["user_ids"] = items["object"]["message"]["from_id"].ToString()
+                                    });
+                                var name = userJson["response"][0]["last_name"].ToString();
+                                var lis = items["object"]["message"]["attachments"];
+                                try
+                                {
+                                    workWithDocuments.ReadFiles(lis, name, arrayData[1].ToLower());
+                                    msg = "Успешно";
+                                }
+                                catch (ArgumentException)
+                                {
+                                    msg = "Неверный формат файла";
+                                }
+                                
                                 break;
                             
                             default:
@@ -98,28 +84,12 @@ namespace VkBot
                     {
                         msg = "Ошибка в команде!\r\n" + GetInform("help");
                     }
-
-                    webClient.DownloadString(
-                        string.Format(urlBotMsg + "{0}&message={1}",
-                            item["object"]["message"]["from_id"],
-                            msg
-                             
-                        ));
+                    server.SendMessage(items["object"]["message"]["from_id"].ToString(), 
+                        msg,
+                        items["object"]["message"]["random_id"].ToString());
                     Thread.Sleep(1000);
                 }
             }
-        }
-
-        private static string GetJsonAnswer(dynamic request, string json, WebClient webClient)
-        {
-            string url = string.Format("{0}?act=a_check&key={1}&ts={2}&wait=3",
-                request.response.server.ToString(),
-                request.response.key.ToString(),
-                json != string.Empty ? JObject.Parse(json)["ts"].ToString() : request.response.ts.ToString()
-            );
-
-            json = webClient.DownloadString(url);
-            return json;
         }
 
         private static string GetComm(string topic)
@@ -150,40 +120,6 @@ namespace VkBot
             }
         }
 
-        private static string SubmitComm(string topic, string url, string title, string name)
-        {
-            try
-            {
-                var path = "C:\\Users\\0811a\\Desktop\\";
-                var ex = title.Split('.');
-                switch (topic)
-                {
-                    case "matan":
-                        DownloadFile(url, path + topic + "\\" + name + "." + ex[1]);
-                        return "Успешно";
-                    
-                    case "algemb":
-                        DownloadFile(url, path + topic + "\\" + title);
-                        return "Успешно";
-                    
-                    case "rus":
-                        DownloadFile(url, path + topic + "\\" + title);
-                        return "Успешно";
-                    
-                    case "algema":
-                        //DownloadFile(url, path + topic);
-                        return SentToEmail("ananichev.dima@mail.ru");
-                    
-                    default:
-                        return GetInform("help");
-                }
-            }
-            catch
-            {
-                return "Файл не доставлен. Попробуй еще раз или напиши в личку";
-            }
-        }
-
         private static string SentToEmail(string email) 
             => $"Отправь задание на почту: {email}. Не забудь подписать файл и работу.";
 
@@ -191,25 +127,14 @@ namespace VkBot
         {
             try
             {
-                using var sr = 
+                using var sr =
                     new StreamReader($"C:\\Users\\0811a\\Desktop\\Sbot\\{name}.txt");
                 return sr.ReadToEnd();
             }
-            catch 
+            catch
             {
                 return "Что-то пошло не так! Напиши старосте";
             }
-        }
-        private static async void DownloadFile(string url, string path)
-        {
-            byte[] data;
-
-            using var client = new HttpClient();
-            using var response = await client.GetAsync(url);
-            using var content = response.Content;
-            data = await content.ReadAsByteArrayAsync();
-            using var file = File.Create(path);
-            file.Write(data, 0, data.Length);
         }
     }
 }
