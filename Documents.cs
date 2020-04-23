@@ -11,38 +11,43 @@ namespace VkBot
 {
     public class Documents
     {
-        private readonly string pathToSaveFiles = "C:\\Users\\0811a\\Desktop\\";
+        private readonly string pathToSaveFiles;
         private readonly string pathToAddFiles;
-        private readonly Server server;
+        //private readonly Server server;
         
-        public Documents(Server server, string pathToSaveFiles, string pathToAddFiles)
+        public Documents(/*Server server, */string pathToSaveFiles, string pathToAddFiles)
         {
             this.pathToSaveFiles = pathToSaveFiles;
             this.pathToAddFiles = pathToAddFiles;
-            this.server = server;
+            //this.server = server;
         }
 
-        /*public string[] OpenXmlListOfStudents(string pathToFile)
+        public HashSet<string> GetStudents(string nameFile)
         {
-            var objExcel = new Microsoft.Office.Interop.Excel.Application();
-            //Открываем книгу.                                                                                                                                                        
-            var objWorkBook = objExcel.Workbooks.Open(pathToFile, 0, true, 5, "", "", false, Microsoft.Office.Interop.Excel.XlPlatform.xlWindows, "", true, false, 0, true, false, false);
-            //Выбираем таблицу(лист).
-            var objWorkSheet = (Microsoft.Office.Interop.Excel.Worksheet)objWorkBook.Sheets[1];
-
-            // Указываем номер столбца (таблицы Excel) из которого будут считываться данные.
-            var numCol = 1;
-    
-            var usedColumn = (Range)objWorkSheet.UsedRange.Columns[numCol];
-            var myvalues = (Array) objWorkBook.Cells.Value2;
-            var strArray = myvalues.OfType<object>().Select(o => o.ToString()).ToArray();
-
-            // Выходим из программы Excel.
-            objExcel.Quit();
+            var strArray = new HashSet<string>();
+            using (var sr = new StreamReader(pathToAddFiles + nameFile))
+            {
+                while(!sr.EndOfStream)
+                    strArray.Add(sr.ReadLine().ToLower());
+            }
             return strArray;
-        }*/
+        }
+
+        public string GetText(string name)
+        {
+            try
+            {
+                using var sr =
+                    new StreamReader(pathToAddFiles + name);
+                return sr.ReadToEnd();
+            }
+            catch
+            {
+                return "Что-то пошло не так! Напиши старосте";
+            }
+        }
         
-        private static void ConverterToPdf(string path, IEnumerable<string> namesWithExt)
+        private void ConverterToPdf(string path, IEnumerable<string> namesWithExt)
         {
             var enumerable = namesWithExt.ToList();
             var document = new Document();
@@ -50,14 +55,20 @@ namespace VkBot
             using var stream = new FileStream(path + nameFile, FileMode.Create, FileAccess.Write, FileShare.None);
             PdfWriter.GetInstance(document, stream);
             document.Open();
-            foreach (var name in enumerable)
+            foreach (var image in enumerable.Select(name => new FileStream(path + name, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)).Select(imageStream => Image.GetInstance(imageStream)))
             {
-                using var imageStream = new FileStream(path + "\\" + name, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                var image = Image.GetInstance(imageStream);
+                image.ScaleAbsoluteHeight(document.PageSize.Height - 50);
+                image.ScaleAbsoluteWidth(document.PageSize.Width - 50);
                 document.Add(image);
             }
-            
-            document.Close();
+            document.CloseDocument();
+        }
+
+        public void WriteTextBag(string message)
+        {
+            using var sr = new StreamWriter(
+                pathToAddFiles + "bag.txt", false, System.Text.Encoding.Default);
+            sr.WriteLine(message + "\n");
         }
         
         private static async void DownloadFile(string url, string path)
@@ -72,7 +83,8 @@ namespace VkBot
 
         private bool CheckImage(string ext) => ext.ToLower() == "jpeg" 
                                                || ext.ToLower() == "png" 
-                                               || ext.ToLower() == "gif";
+                                               || ext.ToLower() == "gif"
+                                               || ext.ToLower() == "jpg";
 
         public bool CheckDoc(string ext) 
             => ext.ToLower() == "pdf" || ext.ToLower() == "doc" || ext.ToLower() == "docx" || ext.ToLower() == "xls" 
@@ -90,7 +102,7 @@ namespace VkBot
                     names.Add(name);
                 DownloadFile(enumerable[i]["doc"]["url"].ToString(), pathToSaveFiles + nameFolder + "\\" + name);
             }
-            //if (names.Any()) ConverterToPdf(pathToSaveFiles + nameFolder + "\\", names);
+            if (names.Any()) ConverterToPdf(pathToSaveFiles + nameFolder + "\\", names);
         }
     }
 }
