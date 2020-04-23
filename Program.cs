@@ -80,7 +80,9 @@ namespace VkBot
                                 var sb = new StringBuilder();
                                 foreach (var str in arrayData.Skip(1)) 
                                     sb.Append(str);
+                                //sb.Append("\n");
                                 workWithDocuments.WriteTextBag(sb.ToString());
+                                msg = "ОК, исправим";
                                 break;
                             
                             default:

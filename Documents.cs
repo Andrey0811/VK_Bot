@@ -67,7 +67,7 @@ namespace VkBot
         public void WriteTextBag(string message)
         {
             using var sr = new StreamWriter(
-                pathToAddFiles + "bag.txt", false, System.Text.Encoding.Default);
+                pathToAddFiles + "bag.txt", true, System.Text.Encoding.Default);
             sr.WriteLine(message + "\n");
         }
         
