@@ -17,7 +17,7 @@ namespace VkBot
             var server = new Server(apiKey, groupId);
             server.Authorize();
             var workWithDocuments = new Documents(/*server, */
-                "C:\\Users\\0811a\\Desktop\\VkBot\\", 
+                "C:\\Users\\0811a\\Desktop\\", 
                 "C:\\Users\\0811a\\Desktop\\VkBot\\Sbot\\");
             var students = workWithDocuments.GetStudents("students.txt");
             
@@ -27,7 +27,7 @@ namespace VkBot
             {
                 json = server.GetJsonAnswer(json);
                 
-                //Console.WriteLine(json);
+                Console.WriteLine(json);
                 var temp = JObject.Parse(json);
                 var col = temp["updates"].ToList();
                 
@@ -64,6 +64,11 @@ namespace VkBot
                                     break;
                                 }
                                 var lis = items["object"]["message"]["attachments"];
+                                if (!lis.Any())
+                                {
+                                    msg = "Не прикреплена работа";
+                                    break;
+                                }
                                 try
                                 {
                                     workWithDocuments.ReadFiles(lis, name, arrayData[1].ToLower());

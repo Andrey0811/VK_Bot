@@ -55,13 +55,18 @@ namespace VkBot
             using var stream = new FileStream(path + nameFile, FileMode.Create, FileAccess.Write, FileShare.None);
             PdfWriter.GetInstance(document, stream);
             document.Open();
-            foreach (var image in enumerable.Select(name => new FileStream(path + name, FileMode.Open, FileAccess.Read, FileShare.ReadWrite)).Select(imageStream => Image.GetInstance(imageStream)))
+            foreach (var name in enumerable)
             {
-                image.ScaleAbsoluteHeight(document.PageSize.Height - 50);
-                image.ScaleAbsoluteWidth(document.PageSize.Width - 50);
+                using var imageStream = new FileStream(
+                    path + name, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                var image = Image.GetInstance(imageStream);
+                imageStream.Close();
+                image.ScaleAbsolute(document.PageSize.Width - 50, document.PageSize.Height - 50);
+                image.Normalize();
                 document.Add(image);
             }
             document.CloseDocument();
+            document.Close();
         }
 
         public void WriteTextBag(string message)
@@ -96,11 +101,25 @@ namespace VkBot
             var names = new List<string>();
             for (var i = 0; i < enumerable.Count; i++)
             {
-                var ext = enumerable[i]["doc"]["ext"].ToString();
-                var name = nameSender + "_" + i + "." + ext;
-                if (CheckImage(ext))
+                string ext;
+                string name;
+                var form = enumerable[i]["type"].ToString();
+                if ("doc" == form)
+                {
+                    ext = enumerable[i][form]["ext"].ToString();
+                    name = nameSender + "_" + i + "." + ext;
+                    if (CheckImage(ext))
+                        names.Add(name);
+                    DownloadFile(enumerable[i][form]["url"].ToString(), pathToSaveFiles + nameFolder + "\\" + name);
+
+                }
+                else
+                {
+                    var url = enumerable[i][form]["sizes"][0]["url"].ToString();
+                    name = nameSender + "_" + i + "." + "jpg";
+                    DownloadFile(url, pathToSaveFiles + nameFolder + "\\" + name);
                     names.Add(name);
-                DownloadFile(enumerable[i]["doc"]["url"].ToString(), pathToSaveFiles + nameFolder + "\\" + name);
+                }
             }
             if (names.Any()) ConverterToPdf(pathToSaveFiles + nameFolder + "\\", names);
         }
