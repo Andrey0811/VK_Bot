@@ -6,6 +6,7 @@ using System.Net.Http;
 using iTextSharp.text;
 using iTextSharp.text.pdf;
 using Newtonsoft.Json.Linq;
+using VkNet.Enums;
 
 namespace VkBot
 {
@@ -49,24 +50,64 @@ namespace VkBot
         
         private void ConverterToPdf(string path, IEnumerable<string> namesWithExt)
         {
-            var enumerable = namesWithExt.ToList();
-            var document = new Document();
-            var nameFile = enumerable[0].Split('_', '.')[0] + ".pdf";
-            using var stream = new FileStream(path + nameFile, FileMode.Create, FileAccess.Write, FileShare.None);
-            PdfWriter.GetInstance(document, stream);
-            document.Open();
-            foreach (var name in enumerable)
+            try
             {
-                using var imageStream = new FileStream(
-                    path + name, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                var image = Image.GetInstance(imageStream);
-                imageStream.Close();
-                image.ScaleAbsolute(document.PageSize.Width - 50, document.PageSize.Height - 50);
-                image.Normalize();
-                document.Add(image);
+                var enumerable = namesWithExt.ToList();
+                var document = new Document();
+                var nameFile = enumerable[0].Split('_', '.')[0] + ".pdf";
+                using var stream = new FileStream(path + nameFile, FileMode.Create, FileAccess.Write, FileShare.None);
+                PdfWriter.GetInstance(document, stream);
+                document.Open();
+                foreach (var name in enumerable)
+                {
+                    using var imageStream = new FileStream(
+                        path + name, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                    var image = Image.GetInstance(imageStream);
+                    imageStream.Close();
+                    ScaleImage(image, document.PageSize.Width - 50, document.PageSize.Height - 50);
+                    //image.ScaleAbsolute(document.PageSize.Width - 50, document.PageSize.Height - 50);
+                    image.Normalize();
+                    document.Add(image);
+                }
+
+                document.CloseDocument();
+                document.Close();
             }
-            document.CloseDocument();
-            document.Close();
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Source);
+            }
+        }
+
+        private void ScaleImage(Image image, float width, float height)
+        {
+            if (image.Width > width && image.Height > height)
+            {
+                if (image.Width >= image.Height) 
+                    ScaleWidth(image, width);
+                else
+                    ScaleHeight(image, height);
+                return;
+            }
+
+            if (image.Width >= width)
+                ScaleWidth(image, width);
+            else
+                ScaleHeight(image, height);
+        }
+
+        private void ScaleWidth(Image image, float width)
+        {
+            var widthImage = image.Width;
+            image.ScaleAbsoluteWidth(width);
+            image.ScaleAbsoluteHeight(image.Height / widthImage * width);
+        }
+        
+        private void ScaleHeight(Image image, float height)
+        {
+            var heightImage = image.Height;
+            image.ScaleAbsoluteHeight(height);
+            image.ScaleAbsoluteWidth(image.Width / heightImage * height);
         }
 
         public void WriteTextBag(string message)
@@ -101,12 +142,11 @@ namespace VkBot
             var names = new List<string>();
             for (var i = 0; i < enumerable.Count; i++)
             {
-                string ext;
                 string name;
                 var form = enumerable[i]["type"].ToString();
                 if ("doc" == form)
                 {
-                    ext = enumerable[i][form]["ext"].ToString();
+                    var ext = enumerable[i][form]["ext"].ToString();
                     name = nameSender + "_" + i + "." + ext;
                     if (CheckImage(ext))
                         names.Add(name);
@@ -115,7 +155,8 @@ namespace VkBot
                 }
                 else
                 {
-                    var url = enumerable[i][form]["sizes"][0]["url"].ToString();
+                    var url = enumerable[i][form]["sizes"][6]["url"].ToString();
+                    Console.WriteLine(enumerable[i][form]["sizes"][6]["height"] + " " + enumerable[i][form]["sizes"][6]["width"]);
                     name = nameSender + "_" + i + "." + "jpg";
                     DownloadFile(url, pathToSaveFiles + nameFolder + "\\" + name);
                     names.Add(name);

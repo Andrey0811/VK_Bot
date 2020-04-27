@@ -50,14 +50,15 @@ namespace VkBot
             return JObject.Parse(temp);
         }
 
-        public void SendMessage(string userId, string message, string randomId)
+        public void SendMessage(string userId, string message, string randomId, string attachment="")
         {
             Request("messages.send", new Dictionary<string, string>
             {
                 ["user_id"] = userId,
                 ["message"] = message,
                 ["group_id"] = groupId,
-                ["random_id"] = randomId
+                ["random_id"] = randomId,
+                ["attachment"] = attachment
             });
         }
         
